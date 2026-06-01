@@ -30,17 +30,20 @@ app.get('/api/rooms', async (req, res) => {
     try {
         const response = await fetch(`${APEX_URL}/rooms`, {
             headers: {
-                'Accept': 'application/json, text/plain, */*',
-                'User-Agent': 'Node.js/Fetch'
+                'Accept': 'application/json',
+                'User-Agent': 'Mozilla/5.0'
             }
         });
         const respText = await response.text().catch(() => '');
         let data = {};
         try { data = respText ? JSON.parse(respText) : {}; } catch { data = { raw: respText }; }
+        
         console.log('Upstream /rooms status:', response.status);
-        console.log('Upstream /rooms headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
-        if (response.ok && data.items) {
-            res.status(200).json(data.items);
+        
+        if (response.ok) {
+            // If data.items is undefined, default safely to an empty array []
+            const roomsArray = data.items || [];
+            res.status(200).json(roomsArray);
         } else {
             res.status(response.status).json({ error: 'Upstream rooms error', details: data });
         }
@@ -91,15 +94,17 @@ app.post('/api/students', async (req, res) => {
 app.get('/api/fees/defaulters', async (req, res) => {
     try {
         const response = await fetch(`${APEX_URL}/fees/defaulters`, {
-            headers: { 'Accept': 'application/json, text/plain, */*', 'User-Agent': 'Node.js/Fetch' }
+            headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }
         });
         const respText = await response.text().catch(() => '');
         let data = {};
         try { data = respText ? JSON.parse(respText) : {}; } catch { data = { raw: respText }; }
+        
         console.log('Upstream /fees/defaulters status:', response.status);
-        console.log('Upstream /fees/defaulters headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
-        if (response.ok && data.items) {
-            res.status(200).json(data.items);
+        
+        if (response.ok) {
+            const feesArray = data.items || [];
+            res.status(200).json(feesArray);
         } else {
             res.status(response.status).json({ error: 'Upstream fees error', details: data });
         }
@@ -130,15 +135,17 @@ app.put('/api/fees/:id/pay', async (req, res) => {
 app.get('/api/complaints/active', async (req, res) => {
     try {
         const response = await fetch(`${APEX_URL}/complaints/active`, {
-            headers: { 'Accept': 'application/json, text/plain, */*', 'User-Agent': 'Node.js/Fetch' }
+            headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }
         });
         const respText = await response.text().catch(() => '');
         let data = {};
         try { data = respText ? JSON.parse(respText) : {}; } catch { data = { raw: respText }; }
+        
         console.log('Upstream /complaints/active status:', response.status);
-        console.log('Upstream /complaints/active headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
-        if (response.ok && data.items) {
-            res.status(200).json(data.items);
+        
+        if (response.ok) {
+            const complaintsArray = data.items || [];
+            res.status(200).json(complaintsArray);
         } else {
             res.status(response.status).json({ error: 'Upstream complaints error', details: data });
         }
