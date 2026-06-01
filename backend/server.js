@@ -282,16 +282,17 @@ app.delete('/api/complaints/:id', async (req, res) => {
 });
 
 // --- 5. AUTHENTICATION SYSTEM ---
-// Handles User Login (Admin & Student)
+// Handles User Login (Admin & Student) - COMPLETELY BYPASSES OAUTH TO PREVENT DEADLOCKS
 app.post('/api/auth/login', async (req, res) => {
     try {
-        // Fallback structure to maintain standard logins natively
-        const headers = await getAuthHeaders();
+        console.log('Attacking login endpoint with clean browser headers...');
         
         const response = await fetch(`${APEX_URL}/auth/login`, {
             method: 'POST',
             headers: {
-                ...headers,
+                'Content-Type': 'application/json',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0 Safari/537.36',
                 'Referer': APEX_URL,
                 'X-Requested-With': 'XMLHttpRequest'
             },
@@ -303,8 +304,6 @@ app.post('/api/auth/login', async (req, res) => {
         try { data = respText ? JSON.parse(respText) : {}; } catch { data = { raw: respText }; }
 
         console.log('Upstream auth response status:', response.status);
-        console.log('Upstream auth response headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
-        console.log('Upstream auth response body (truncated):', (respText || '').slice(0, 1000));
 
         if (response.status === 200) {
             res.status(200).json(data);
