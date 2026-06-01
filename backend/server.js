@@ -5,6 +5,9 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 5000;
 const APEX_URL = process.env.ORACLE_BASE_URL;
+const OAUTH_URL = process.env.ORACLE_OAUTH_URL;
+const CLIENT_ID = process.env.ORACLE_CLIENT_ID;
+const CLIENT_SECRET = process.env.ORACLE_CLIENT_SECRET;
 
 // Middleware
 app.use(cors());
@@ -19,21 +22,84 @@ app.use((req, res, next) => {
     next();
 });
 
-// Early check: ensure APEX_URL is configured
+// Early check: ensure required environment variables are configured
 if (!APEX_URL) {
     console.warn('WARNING: ORACLE_BASE_URL is not set. Backend proxy requests will fail.');
+}
+if (!OAUTH_URL || !CLIENT_ID || !CLIENT_SECRET) {
+    console.warn('WARNING: OAuth variables (ORACLE_OAUTH_URL, CLIENT_ID, CLIENT_SECRET) are incomplete. WAF bypass might fail.');
+}
+
+// --- TOKEN MANAGER (In-Memory OAuth Cache) ---
+let cachedToken = null;
+let tokenExpiry = null;
+
+async function getOracleBearerToken() {
+    // If token exists and is valid (with a 60-second safety buffer), reuse it
+    if (cachedToken && tokenExpiry && Date.now() < tokenExpiry) {
+        return cachedToken;
+    }
+
+    try {
+        console.log('Initiating cryptographic handshake with Oracle Identity Server...');
+        
+        // Construct standard Basic Authentication header
+        const credentials = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
+
+        const response = await fetch(OAUTH_URL, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Basic ${credentials}`,
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: 'grant_type=client_credentials'
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => '');
+            throw new Error(`Token endpoint responded with status ${response.status}: ${errorText}`);
+        }
+
+        const data = await response.json();
+        cachedToken = data.access_token;
+        // Expire token based on 'expires_in' field (usually 3600s), minus 60s window
+        tokenExpiry = Date.now() + (data.expires_in * 1000) - 60000;
+
+        console.log('🔐 Cryptographic passport successfully acquired from Oracle Cloud.');
+        return cachedToken;
+    } catch (error) {
+        console.error('❌ OAuth boundary token negotiation failed:', error.message);
+        throw error;
+    }
+}
+
+// Helper to generate authorized headers for upstream queries
+async function getAuthHeaders() {
+    try {
+        const token = await getOracleBearerToken();
+        return {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 HostelManagementProxy/1.0'
+        };
+    } catch {
+        // Fallback to minimal layout if token generation throws
+        return {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0'
+        };
+    }
 }
 
 // --- 1. ROOMS & ALLOCATIONS ---
 // Get available rooms
 app.get('/api/rooms', async (req, res) => {
     try {
-        const response = await fetch(`${APEX_URL}/rooms`, {
-            headers: {
-                'Accept': 'application/json',
-                'User-Agent': 'Mozilla/5.0'
-            }
-        });
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${APEX_URL}/rooms`, { headers });
+        
         const respText = await response.text().catch(() => '');
         let data = {};
         try { data = respText ? JSON.parse(respText) : {}; } catch { data = { raw: respText }; }
@@ -41,7 +107,6 @@ app.get('/api/rooms', async (req, res) => {
         console.log('Upstream /rooms status:', response.status);
         
         if (response.ok) {
-            // If data.items is undefined, default safely to an empty array []
             const roomsArray = data.items || [];
             res.status(200).json(roomsArray);
         } else {
@@ -55,15 +120,17 @@ app.get('/api/rooms', async (req, res) => {
 // Assign a student to a room
 app.post('/api/allocations', async (req, res) => {
     try {
+        const headers = await getAuthHeaders();
         const response = await fetch(`${APEX_URL}/allocations`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: headers,
             body: JSON.stringify(req.body)
         });
-        if (response.status === 201) {
+        if (response.status === 201 || response.ok) {
             res.status(201).json({ message: "Room allocation processed successfully!" });
         } else {
-            res.status(response.status).json({ error: "Failed to process allocation" });
+            const data = await response.json().catch(() => ({}));
+            res.status(response.status).json({ error: "Failed to process allocation", details: data });
         }
     } catch (err) {
         res.status(500).json({ error: "Server Error", details: err.message });
@@ -74,15 +141,17 @@ app.post('/api/allocations', async (req, res) => {
 // Register a new student
 app.post('/api/students', async (req, res) => {
     try {
+        const headers = await getAuthHeaders();
         const response = await fetch(`${APEX_URL}/students`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: headers,
             body: JSON.stringify(req.body)
         });
-        if (response.status === 201) {
+        if (response.status === 201 || response.ok) {
             res.status(201).json({ message: "Student registered successfully inside Oracle Cloud!" });
         } else {
-            res.status(response.status).json({ error: "Registration failed" });
+            const data = await response.json().catch(() => ({}));
+            res.status(response.status).json({ error: "Registration failed", details: data });
         }
     } catch (err) {
         res.status(500).json({ error: "Server Error", details: err.message });
@@ -93,9 +162,9 @@ app.post('/api/students', async (req, res) => {
 // Get fee defaulters list
 app.get('/api/fees/defaulters', async (req, res) => {
     try {
-        const response = await fetch(`${APEX_URL}/fees/defaulters`, {
-            headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }
-        });
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${APEX_URL}/fees/defaulters`, { headers });
+        
         const respText = await response.text().catch(() => '');
         let data = {};
         try { data = respText ? JSON.parse(respText) : {}; } catch { data = { raw: respText }; }
@@ -116,9 +185,10 @@ app.get('/api/fees/defaulters', async (req, res) => {
 // Mark an invoice as paid
 app.put('/api/fees/:id/pay', async (req, res) => {
     try {
+        const headers = await getAuthHeaders();
         const response = await fetch(`${APEX_URL}/fees/${req.params.id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' }
+            headers: headers
         });
         if (response.ok) {
             res.status(200).json({ message: `Invoice #${req.params.id} marked as Paid successfully.` });
@@ -134,9 +204,9 @@ app.put('/api/fees/:id/pay', async (req, res) => {
 // Get active complaints summary dashboard
 app.get('/api/complaints/active', async (req, res) => {
     try {
-        const response = await fetch(`${APEX_URL}/complaints/active`, {
-            headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }
-        });
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${APEX_URL}/complaints/active`, { headers });
+        
         const respText = await response.text().catch(() => '');
         let data = {};
         try { data = respText ? JSON.parse(respText) : {}; } catch { data = { raw: respText }; }
@@ -157,9 +227,10 @@ app.get('/api/complaints/active', async (req, res) => {
 // File a new complaint
 app.post('/api/complaints/active', async (req, res) => {
     try {
+        const headers = await getAuthHeaders();
         const response = await fetch(`${APEX_URL}/complaints/active`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: headers,
             body: JSON.stringify(req.body)
         });
         if (response.status === 201 || response.ok) {
@@ -176,9 +247,10 @@ app.post('/api/complaints/active', async (req, res) => {
 // Update complaint status (Resolve a complaint)
 app.put('/api/complaints/:id', async (req, res) => {
     try {
+        const headers = await getAuthHeaders();
         const response = await fetch(`${APEX_URL}/complaints/${req.params.id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: headers,
             body: JSON.stringify(req.body)
         });
         if (response.ok) {
@@ -194,8 +266,10 @@ app.put('/api/complaints/:id', async (req, res) => {
 // Delete a complaint
 app.delete('/api/complaints/:id', async (req, res) => {
     try {
+        const headers = await getAuthHeaders();
         const response = await fetch(`${APEX_URL}/complaints/${req.params.id}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: headers
         });
         if (response.ok) {
             res.status(200).json({ message: `Complaint #${req.params.id} deleted successfully.` });
@@ -211,37 +285,30 @@ app.delete('/api/complaints/:id', async (req, res) => {
 // Handles User Login (Admin & Student)
 app.post('/api/auth/login', async (req, res) => {
     try {
-        // Add some common browser-like headers to reduce WAF blocking
+        // Fallback structure to maintain standard logins natively
+        const headers = await getAuthHeaders();
+        
         const response = await fetch(`${APEX_URL}/auth/login`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0 Safari/537.36',
+                ...headers,
                 'Referer': APEX_URL,
                 'X-Requested-With': 'XMLHttpRequest'
             },
-            body: JSON.stringify(req.body) // Sends { username, password }
+            body: JSON.stringify(req.body)
         });
 
         const respText = await response.text().catch(() => '');
         let data = {};
-        try {
-            data = respText ? JSON.parse(respText) : {};
-        } catch (parseErr) {
-            // Not JSON — keep raw text for debugging
-            data = { raw: respText };
-        }
+        try { data = respText ? JSON.parse(respText) : {}; } catch { data = { raw: respText }; }
 
         console.log('Upstream auth response status:', response.status);
         console.log('Upstream auth response headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
         console.log('Upstream auth response body (truncated):', (respText || '').slice(0, 1000));
 
         if (response.status === 200) {
-            // Send role and student_id back to frontend session manager
             res.status(200).json(data);
         } else {
-            // Forward status and include upstream body for troubleshooting
             res.status(response.status).json({ error: 'Upstream auth error', details: data });
         }
     } catch (err) {
@@ -252,7 +319,7 @@ app.post('/api/auth/login', async (req, res) => {
 
 // Start the Server
 app.listen(PORT, () => {
-    console.log(`🚀 Node.js Gateway proxying traffic to Oracle Cloud on port ${PORT}`);
+    console.log(`🚀 Node.js Gateway proxying traffic to Oracle Cloud via OAuth 2.0 on port ${PORT}`);
     console.log('APEX_URL present:', Boolean(APEX_URL));
 });
 
