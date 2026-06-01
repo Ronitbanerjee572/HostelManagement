@@ -19,6 +19,7 @@ dist-ssr
 
 # Backend node modules
 backend/node_modules
+backend/structure.txt
 
 # Editor directories and files
 .vscode/*
