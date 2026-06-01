@@ -1,0 +1,182 @@
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+const APEX_URL = process.env.ORACLE_BASE_URL;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// --- 1. ROOMS & ALLOCATIONS ---
+// Get available rooms
+app.get('/api/rooms', async (req, res) => {
+    try {
+        const response = await fetch(`${APEX_URL}/rooms`);
+        const data = await response.json();
+        res.status(200).json(data.items);
+    } catch (err) {
+        res.status(500).json({ error: "Failed to communicate with Oracle DB", details: err.message });
+    }
+});
+
+// Assign a student to a room
+app.post('/api/allocations', async (req, res) => {
+    try {
+        const response = await fetch(`${APEX_URL}/allocations`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(req.body)
+        });
+        if (response.status === 201) {
+            res.status(201).json({ message: "Room allocation processed successfully!" });
+        } else {
+            res.status(response.status).json({ error: "Failed to process allocation" });
+        }
+    } catch (err) {
+        res.status(500).json({ error: "Server Error", details: err.message });
+    }
+});
+
+// --- 2. STUDENTS ---
+// Register a new student
+app.post('/api/students', async (req, res) => {
+    try {
+        const response = await fetch(`${APEX_URL}/students`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(req.body)
+        });
+        if (response.status === 201) {
+            res.status(201).json({ message: "Student registered successfully inside Oracle Cloud!" });
+        } else {
+            res.status(response.status).json({ error: "Registration failed" });
+        }
+    } catch (err) {
+        res.status(500).json({ error: "Server Error", details: err.message });
+    }
+});
+
+// --- 3. FEE TRACKING ---
+// Get fee defaulters list
+app.get('/api/fees/defaulters', async (req, res) => {
+    try {
+        const response = await fetch(`${APEX_URL}/fees/defaulters`);
+        const data = await response.json();
+        res.status(200).json(data.items);
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch financial data", details: err.message });
+    }
+});
+
+// Mark an invoice as paid
+app.put('/api/fees/:id/pay', async (req, res) => {
+    try {
+        const response = await fetch(`${APEX_URL}/fees/${req.params.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        if (response.ok) {
+            res.status(200).json({ message: `Invoice #${req.params.id} marked as Paid successfully.` });
+        } else {
+            res.status(response.status).json({ error: "Failed to update payment record" });
+        }
+    } catch (err) {
+        res.status(500).json({ error: "Server Error", details: err.message });
+    }
+});
+
+// --- 4. COMPLAINT SYSTEM ---
+// Get active complaints summary dashboard
+app.get('/api/complaints/active', async (req, res) => {
+    try {
+        const response = await fetch(`${APEX_URL}/complaints/active`);
+        const data = await response.json();
+        res.status(200).json(data.items);
+    } catch (err) {
+        res.status(500).json({ error: "Failed to fetch complaints data", details: err.message });
+    }
+});
+
+// File a new complaint
+app.post('/api/complaints/active', async (req, res) => {
+    try {
+        const response = await fetch(`${APEX_URL}/complaints/active`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(req.body)
+        });
+        if (response.status === 201 || response.ok) {
+            res.status(201).json({ message: "Complaint submitted successfully." });
+        } else {
+            const data = await response.json().catch(() => ({}));
+            res.status(response.status).json(data.error ? data : { error: "Failed to submit complaint" });
+        }
+    } catch (err) {
+        res.status(500).json({ error: "Server Error", details: err.message });
+    }
+});
+
+// Update complaint status (Resolve a complaint)
+app.put('/api/complaints/:id', async (req, res) => {
+    try {
+        const response = await fetch(`${APEX_URL}/complaints/${req.params.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(req.body)
+        });
+        if (response.ok) {
+            res.status(200).json({ message: `Complaint #${req.params.id} updated successfully.` });
+        } else {
+            res.status(response.status).json({ error: "Failed to update complaint" });
+        }
+    } catch (err) {
+        res.status(500).json({ error: "Server Error", details: err.message });
+    }
+});
+
+// Delete a complaint
+app.delete('/api/complaints/:id', async (req, res) => {
+    try {
+        const response = await fetch(`${APEX_URL}/complaints/${req.params.id}`, {
+            method: 'DELETE'
+        });
+        if (response.ok) {
+            res.status(200).json({ message: `Complaint #${req.params.id} deleted successfully.` });
+        } else {
+            res.status(response.status).json({ error: "Failed to delete complaint" });
+        }
+    } catch (err) {
+        res.status(500).json({ error: "Server Error", details: err.message });
+    }
+});
+
+// --- 5. AUTHENTICATION SYSTEM ---
+// Handles User Login (Admin & Student)
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const response = await fetch(`${APEX_URL}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(req.body) // Sends { username, password }
+        });
+        
+        const data = await response.json();
+        
+        if (response.status === 200) {
+            // Send role and student_id back to frontend session manager
+            res.status(200).json(data);
+        } else {
+            res.status(response.status).json(data);
+        }
+    } catch (err) {
+        res.status(500).json({ error: "Authentication system failure", details: err.message });
+    }
+});
+
+// Start the Server
+app.listen(PORT, () => {
+    console.log(`🚀 Node.js Gateway proxying traffic to Oracle Cloud on port ${PORT}`);
+});
