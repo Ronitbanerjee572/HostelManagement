@@ -10,6 +10,20 @@ const APEX_URL = process.env.ORACLE_BASE_URL;
 app.use(cors());
 app.use(express.json());
 
+// Request logger (helps debugging in hosted environments)
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
+    if (Object.keys(req.body || {}).length) {
+        console.log('Request body:', JSON.stringify(req.body));
+    }
+    next();
+});
+
+// Early check: ensure APEX_URL is configured
+if (!APEX_URL) {
+    console.warn('WARNING: ORACLE_BASE_URL is not set. Backend proxy requests will fail.');
+}
+
 // --- 1. ROOMS & ALLOCATIONS ---
 // Get available rooms
 app.get('/api/rooms', async (req, res) => {
@@ -162,16 +176,28 @@ app.post('/api/auth/login', async (req, res) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(req.body) // Sends { username, password }
         });
-        
-        const data = await response.json();
-        
+
+        const respText = await response.text().catch(() => '');
+        let data = {};
+        try {
+            data = respText ? JSON.parse(respText) : {};
+        } catch (parseErr) {
+            // Not JSON — keep raw text for debugging
+            data = { raw: respText };
+        }
+
+        console.log('Upstream auth response status:', response.status);
+        console.log('Upstream auth response body (truncated):', (respText || '').slice(0, 1000));
+
         if (response.status === 200) {
             // Send role and student_id back to frontend session manager
             res.status(200).json(data);
         } else {
-            res.status(response.status).json(data);
+            // Forward status and include upstream body for troubleshooting
+            res.status(response.status).json({ error: 'Upstream auth error', details: data });
         }
     } catch (err) {
+        console.error('Error in /api/auth/login:', err);
         res.status(500).json({ error: "Authentication system failure", details: err.message });
     }
 });
@@ -179,4 +205,11 @@ app.post('/api/auth/login', async (req, res) => {
 // Start the Server
 app.listen(PORT, () => {
     console.log(`🚀 Node.js Gateway proxying traffic to Oracle Cloud on port ${PORT}`);
+    console.log('APEX_URL present:', Boolean(APEX_URL));
+});
+
+// Global error handler for uncaught errors
+app.use((err, req, res, next) => {
+    console.error('Unhandled error:', err);
+    res.status(500).json({ error: 'Server Error', details: err?.message || 'Unexpected error' });
 });
