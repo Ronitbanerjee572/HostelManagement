@@ -28,9 +28,22 @@ if (!APEX_URL) {
 // Get available rooms
 app.get('/api/rooms', async (req, res) => {
     try {
-        const response = await fetch(`${APEX_URL}/rooms`);
-        const data = await response.json();
-        res.status(200).json(data.items);
+        const response = await fetch(`${APEX_URL}/rooms`, {
+            headers: {
+                'Accept': 'application/json, text/plain, */*',
+                'User-Agent': 'Node.js/Fetch'
+            }
+        });
+        const respText = await response.text().catch(() => '');
+        let data = {};
+        try { data = respText ? JSON.parse(respText) : {}; } catch { data = { raw: respText }; }
+        console.log('Upstream /rooms status:', response.status);
+        console.log('Upstream /rooms headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
+        if (response.ok && data.items) {
+            res.status(200).json(data.items);
+        } else {
+            res.status(response.status).json({ error: 'Upstream rooms error', details: data });
+        }
     } catch (err) {
         res.status(500).json({ error: "Failed to communicate with Oracle DB", details: err.message });
     }
@@ -77,9 +90,19 @@ app.post('/api/students', async (req, res) => {
 // Get fee defaulters list
 app.get('/api/fees/defaulters', async (req, res) => {
     try {
-        const response = await fetch(`${APEX_URL}/fees/defaulters`);
-        const data = await response.json();
-        res.status(200).json(data.items);
+        const response = await fetch(`${APEX_URL}/fees/defaulters`, {
+            headers: { 'Accept': 'application/json, text/plain, */*', 'User-Agent': 'Node.js/Fetch' }
+        });
+        const respText = await response.text().catch(() => '');
+        let data = {};
+        try { data = respText ? JSON.parse(respText) : {}; } catch { data = { raw: respText }; }
+        console.log('Upstream /fees/defaulters status:', response.status);
+        console.log('Upstream /fees/defaulters headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
+        if (response.ok && data.items) {
+            res.status(200).json(data.items);
+        } else {
+            res.status(response.status).json({ error: 'Upstream fees error', details: data });
+        }
     } catch (err) {
         res.status(500).json({ error: "Failed to fetch financial data", details: err.message });
     }
@@ -106,9 +129,19 @@ app.put('/api/fees/:id/pay', async (req, res) => {
 // Get active complaints summary dashboard
 app.get('/api/complaints/active', async (req, res) => {
     try {
-        const response = await fetch(`${APEX_URL}/complaints/active`);
-        const data = await response.json();
-        res.status(200).json(data.items);
+        const response = await fetch(`${APEX_URL}/complaints/active`, {
+            headers: { 'Accept': 'application/json, text/plain, */*', 'User-Agent': 'Node.js/Fetch' }
+        });
+        const respText = await response.text().catch(() => '');
+        let data = {};
+        try { data = respText ? JSON.parse(respText) : {}; } catch { data = { raw: respText }; }
+        console.log('Upstream /complaints/active status:', response.status);
+        console.log('Upstream /complaints/active headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
+        if (response.ok && data.items) {
+            res.status(200).json(data.items);
+        } else {
+            res.status(response.status).json({ error: 'Upstream complaints error', details: data });
+        }
     } catch (err) {
         res.status(500).json({ error: "Failed to fetch complaints data", details: err.message });
     }
