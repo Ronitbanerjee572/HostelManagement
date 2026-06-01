@@ -171,9 +171,16 @@ app.delete('/api/complaints/:id', async (req, res) => {
 // Handles User Login (Admin & Student)
 app.post('/api/auth/login', async (req, res) => {
     try {
+        // Add some common browser-like headers to reduce WAF blocking
         const response = await fetch(`${APEX_URL}/auth/login`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0 Safari/537.36',
+                'Referer': APEX_URL,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
             body: JSON.stringify(req.body) // Sends { username, password }
         });
 
@@ -187,6 +194,7 @@ app.post('/api/auth/login', async (req, res) => {
         }
 
         console.log('Upstream auth response status:', response.status);
+        console.log('Upstream auth response headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
         console.log('Upstream auth response body (truncated):', (respText || '').slice(0, 1000));
 
         if (response.status === 200) {
