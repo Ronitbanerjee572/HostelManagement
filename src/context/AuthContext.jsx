@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import { API_BASE } from '../config/api';
+import api from '../config/api';
 
 const STORAGE_KEY = 'hms_auth';
+const TOKEN_KEY = 'token'; // Matches the key used by our Axios interceptor
 
 const AuthContext = createContext(null);
 
@@ -22,41 +23,37 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const login = useCallback(async (username, password) => {
+  const login = useCallback(async (email, password) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
-      const data = await response.json().catch(() => ({}));
+      const res = await api.post('/auth/login', { email: email.trim(), password });
+      const data = res.data || {};
 
-      if (!response.ok) {
-        const message = data.error || data.message || 'Invalid credentials';
-        throw new Error(message);
-      }
-
-      const role = data.role;
+      // Map backend 'user_role' to frontend 'role'
+      const role = data.user_role;
       if (role !== 'admin' && role !== 'student') {
         throw new Error('Unknown account role. Contact administration.');
+      }
+
+      // Save standalone JWT token for the Axios interceptor
+      if (data.token) {
+        localStorage.setItem(TOKEN_KEY, data.token);
       }
 
       const session = {
         role,
         student_id: data.student_id ?? '',
-        username: username.trim(),
-        status: data.status,
+        username: email.trim(),
       };
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
       setAuth(session);
       return session;
     } catch (err) {
-      const message = err.message || 'Login failed';
+      const message = err.response?.data?.error || err.response?.data?.message || err.message || 'Login failed';
       setError(message);
-      throw err;
+      throw new Error(message);
     } finally {
       setLoading(false);
     }
@@ -64,6 +61,7 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(TOKEN_KEY);
     setAuth(null);
     setError(null);
   }, []);

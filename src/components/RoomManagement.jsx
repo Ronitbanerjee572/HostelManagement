@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { API_BASE } from '../config/api';
-import { field } from '../utils/records';
+import api from '../config/api';
 import AssignRoomModal from './AssignRoomModal';
 
 export default function RoomManagement() {
@@ -14,15 +13,11 @@ export default function RoomManagement() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE}/rooms`);
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to load rooms');
-      }
-      const data = await response.json();
-      setRooms(Array.isArray(data) ? data : []);
+      const res = await api.get('/rooms');
+      setRooms(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      setError(err.message);
+      const message = err?.response?.data?.message || err?.message || 'Failed to load rooms';
+      setError(message);
       setRooms([]);
     } finally {
       setLoading(false);
@@ -68,53 +63,46 @@ export default function RoomManagement() {
             <tr>
               <th>Room</th>
               <th>Capacity</th>
-              <th>Occupied</th>
-              <th>Student</th>
+              <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {rooms.length === 0 ? (
               <tr>
-                <td colSpan={5} className="empty-cell">
+                <td colSpan={4} className="empty-cell">
                   No room records available.
                 </td>
               </tr>
             ) : (
-              rooms.map((room, index) => {
-                const roomNumber = field(room, 'room_number', 'room_no', 'room') ?? `Room-${index}`;
-                const occupied = field(room, 'occupied', 'is_occupied', 'occupancy');
-                const student = field(room, 'student_id', 'assigned_student', 'resident_id');
+              rooms.map((room) => {
+                // Direct mapping to Oracle columns (ORDS lowercases column names by default)
+                const roomId = room.room_id;
+                const roomNumber = room.room_number;
+                const capacity = room.capacity;
+                const status = room.status || 'AVAILABLE';
 
                 return (
-                  <tr key={roomNumber}>
+                  <tr key={roomId || roomNumber}>
                     <td>
                       <strong>{roomNumber}</strong>
                     </td>
-                    <td>{field(room, 'capacity', 'max_capacity') ?? '—'}</td>
+                    <td>{capacity ?? '—'}</td>
                     <td>
                       <span
                         className={`status-pill ${
-                          occupied === true ||
-                          occupied === 'Y' ||
-                          occupied === 1 ||
-                          occupied === '1' ||
-                          student
-                            ? 'status-occupied'
-                            : 'status-vacant'
+                          status === 'AVAILABLE' ? 'status-vacant' : 'status-occupied'
                         }`}
                       >
-                        {student || occupied === true || occupied === 'Y' || occupied === 1
-                          ? 'Occupied'
-                          : 'Vacant'}
+                        {status}
                       </span>
                     </td>
-                    <td>{student ?? '—'}</td>
                     <td>
                       <button
                         type="button"
                         className="btn btn-sm btn-primary"
-                        onClick={() => setAssignRoom(roomNumber)}
+                        onClick={() => setAssignRoom(room)} // Pass the whole room object, not just the number
+                        disabled={status === 'FULL' || status === 'MAINTENANCE'}
                       >
                         Assign student
                       </button>
@@ -129,7 +117,7 @@ export default function RoomManagement() {
 
       {assignRoom && (
         <AssignRoomModal
-          roomNumber={assignRoom}
+          room={assignRoom}
           onClose={() => setAssignRoom(null)}
           onSuccess={handleAssignSuccess}
         />

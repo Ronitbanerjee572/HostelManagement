@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { API_BASE } from '../config/api';
+import api from '../config/api'; // Use the Axios instance that attaches the JWT
 
-export default function AssignRoomModal({ roomNumber, onClose, onSuccess }) {
+export default function AssignRoomModal({ room, onClose, onSuccess }) {
   const [studentId, setStudentId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -17,24 +17,22 @@ export default function AssignRoomModal({ roomNumber, onClose, onSuccess }) {
 
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/allocations`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          student_id: studentId.trim(),
-          room_number: roomNumber,
-        }),
+      // Send the exact fields required by your Oracle Allocations table
+      await api.post('/allocations', {
+        student_id: Number(studentId.trim()), 
+        room_id: room.room_id,
+        start_date: new Date().toISOString().split('T')[0], // Sends today's date as YYYY-MM-DD
       });
-      const data = await response.json().catch(() => ({}));
 
-      if (!response.ok) {
-        throw new Error(data.error || data.message || 'Allocation failed');
-      }
+      // Optional future enhancement: You could also trigger a PUT request to /api/rooms/${room.room_id} 
+      // here to automatically update the room's status to 'FULL' if capacity is reached!
 
-      onSuccess?.(data.message);
+      onSuccess?.(`Student assigned to ${room.room_number} successfully.`);
       onClose();
     } catch (err) {
-      setError(err.message);
+      // Axios stores the server error inside err.response.data
+      const serverMessage = err.response?.data?.error || err.response?.data?.details || err.message;
+      setError(`Allocation failed: ${serverMessage}`);
     } finally {
       setLoading(false);
     }
@@ -49,7 +47,7 @@ export default function AssignRoomModal({ roomNumber, onClose, onSuccess }) {
         onClick={(e) => e.stopPropagation()}
       >
         <header className="modal-header">
-          <h3 id="assign-room-title">Assign student to room {roomNumber}</h3>
+          <h3 id="assign-room-title">Assign student to room {room?.room_number}</h3>
           <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
             ×
           </button>
@@ -63,9 +61,9 @@ export default function AssignRoomModal({ roomNumber, onClose, onSuccess }) {
           )}
 
           <label className="field">
-            <span>Student ID</span>
+            <span>Student ID (Database ID)</span>
             <input
-              type="text"
+              type="number"
               value={studentId}
               onChange={(e) => setStudentId(e.target.value)}
               placeholder="e.g. 13000123076"
@@ -76,7 +74,8 @@ export default function AssignRoomModal({ roomNumber, onClose, onSuccess }) {
 
           <label className="field">
             <span>Room number</span>
-            <input type="text" value={roomNumber} readOnly className="input-readonly" />
+            {/* Read the room number from the passed room object */}
+            <input type="text" value={room?.room_number || ''} readOnly className="input-readonly" />
           </label>
 
           <div className="modal-actions">

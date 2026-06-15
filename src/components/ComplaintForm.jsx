@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { API_BASE } from '../config/api';
+import api from '../config/api';
 import { useAuth } from '../context/AuthContext';
 
 const CATEGORIES = ['Wifi', 'Water', 'Electricity', 'Cleanliness', 'Security', 'Maintenance', 'Other'];
@@ -24,26 +24,18 @@ export default function ComplaintForm({ onSubmitted }) {
 
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/complaints/active`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          student_id: studentId,
-          category,
-          description: description.trim(),
-        }),
+      const res = await api.post('/complaints', {
+        student_id: studentId,
+        title: category, // backend expects `title`
+        description: description.trim(),
       });
-      const data = await response.json().catch(() => ({}));
 
-      if (!response.ok) {
-        throw new Error(data.error || data.message || 'Failed to submit complaint');
-      }
-
+      const data = res.data || {};
       setMessage(data.message || 'Complaint submitted successfully.');
       setDescription('');
       onSubmitted?.();
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.error || err.message || 'Failed to submit complaint');
     } finally {
       setLoading(false);
     }

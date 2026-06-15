@@ -5,7 +5,8 @@ import { useAuth } from '../context/AuthContext';
 export default function Login() {
   const { login, loading, error, isAuthenticated, role, setError } = useAuth();
   const navigate = useNavigate();
-  const [username, setUsername] = useState('');
+  // Changed state from username to email to match backend
+  const [email, setEmail] = useState(''); 
   const [password, setPassword] = useState('');
   const [localError, setLocalError] = useState('');
 
@@ -18,13 +19,13 @@ export default function Login() {
     setLocalError('');
     setError(null);
 
-    if (!username.trim() || !password) {
-      setLocalError('Username and password are required.');
+    if (!email.trim() || !password) {
+      setLocalError('Email and password are required.');
       return;
     }
 
     try {
-      const session = await login(username, password);
+      const session = await login(email, password);
       navigate(session.role === 'admin' ? '/admin' : '/student', { replace: true });
     } catch (err) {
       setLocalError(err.message);
@@ -52,13 +53,13 @@ export default function Login() {
           )}
 
           <label className="field">
-            <span>Username</span>
+            <span>Email Address</span>
             <input
-              type="text"
-              autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="admin1 or your student username"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin@hostel.com or student email"
               disabled={loading}
             />
           </label>
@@ -82,8 +83,7 @@ export default function Login() {
 
         <div className="login-hints">
           <p>
-            <strong>Admin:</strong> use your admin credentials for room, fee, and complaint
-            operations.
+            <strong>Admin:</strong> use your admin credentials for room, fee, and complaint operations.
           </p>
           <p>
             <strong>Student:</strong> use your student account to view fees and file complaints.

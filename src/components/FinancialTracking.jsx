@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { API_BASE } from '../config/api';
+import api from '../config/api';
 import { field, recordId } from '../utils/records';
 
 export default function FinancialTracking() {
@@ -13,12 +13,8 @@ export default function FinancialTracking() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE}/fees/defaulters`);
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to load fee defaulters');
-      }
-      const data = await response.json();
+      const res = await api.get('/fees/defaulters');
+      const data = res.data || [];
       setFees(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err.message);
@@ -42,21 +38,13 @@ export default function FinancialTracking() {
     setPayingId(id);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE}/fees/${id}/pay`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(data.error || data.message || 'Payment update failed');
-      }
-
+      const res = await api.put(`/fees/${id}`, { status: 'PAID' });
+      const data = res.data || {};
       setToast(data.message || `Invoice #${id} marked as paid.`);
       await loadFees();
       setTimeout(() => setToast(null), 4000);
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.error || err.message || 'Payment update failed');
     } finally {
       setPayingId(null);
     }

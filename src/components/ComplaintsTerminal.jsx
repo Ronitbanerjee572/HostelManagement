@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { API_BASE } from '../config/api';
+import api from '../config/api';
 import { field, recordId } from '../utils/records';
 
 export default function ComplaintsTerminal() {
@@ -13,12 +13,8 @@ export default function ComplaintsTerminal() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE}/complaints/active`);
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to load complaints');
-      }
-      const data = await response.json();
+      const res = await api.get('/complaints/active');
+      const data = res.data || [];
       setComplaints(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err.message);
@@ -39,22 +35,13 @@ export default function ComplaintsTerminal() {
     setActionId(`resolve-${id}`);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE}/complaints/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'Resolved' }),
-      });
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(data.error || data.message || 'Failed to resolve complaint');
-      }
-
+      const res = await api.put(`/complaints/${id}/resolve`);
+      const data = res.data || {};
       setToast(data.message || `Complaint #${id} resolved.`);
       await loadComplaints();
       setTimeout(() => setToast(null), 4000);
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.error || err.message || 'Failed to resolve complaint');
     } finally {
       setActionId(null);
     }
@@ -71,20 +58,13 @@ export default function ComplaintsTerminal() {
     setActionId(`delete-${id}`);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE}/complaints/${id}`, {
-        method: 'DELETE',
-      });
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(data.error || data.message || 'Failed to delete complaint');
-      }
-
+      const res = await api.delete(`/complaints/${id}`);
+      const data = res.data || {};
       setToast(data.message || `Complaint #${id} deleted.`);
       await loadComplaints();
       setTimeout(() => setToast(null), 4000);
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.error || err.message || 'Failed to delete complaint');
     } finally {
       setActionId(null);
     }

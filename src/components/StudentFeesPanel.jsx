@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { API_BASE } from '../config/api';
+import api from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { field, matchesStudentId } from '../utils/records';
 
@@ -13,14 +13,15 @@ export default function StudentFeesPanel() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE}/fees/defaulters`);
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to load fee records');
+      if (!studentId) {
+        setFees([]);
+        return;
       }
-      const data = await response.json();
+
+      const res = await api.get(`/student/${studentId}/fees`);
+      const data = res.data || [];
       const list = Array.isArray(data) ? data : [];
-      setFees(list.filter((row) => matchesStudentId(row, studentId)));
+      setFees(list);
     } catch (err) {
       setError(err.message);
       setFees([]);
