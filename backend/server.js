@@ -198,6 +198,23 @@ app.post('/api/allocations', async (req, res) => {
     }
 });
 
+// LIST ALL ALLOCATIONS (ADMIN VIEW)
+app.get('/api/allocations', async (req, res) => {
+    try {
+        const [rows] = await pool.query(`
+            SELECT a.allocation_id, a.student_id, a.room_id, a.start_date,
+                   s.name AS student_name, s.roll_number AS student_roll, r.room_number
+            FROM allocations a
+            LEFT JOIN students s ON a.student_id = s.student_id
+            LEFT JOIN rooms r ON a.room_id = r.room_id
+            ORDER BY a.start_date DESC
+        `);
+        res.status(200).json(rows);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch allocations', details: err.message });
+    }
+});
+
 // EXTRACT OVERALL OUTSTANDING DEFAULTERS LIST (ADMIN VIEW)
 app.get('/api/fees/defaulters', async (req, res) => {
     try {

@@ -2,11 +2,9 @@ import { useState } from 'react';
 import api from '../config/api';
 import { useAuth } from '../context/AuthContext';
 
-const CATEGORIES = ['Wifi', 'Water', 'Electricity', 'Cleanliness', 'Security', 'Maintenance', 'Other'];
-
 export default function ComplaintForm({ onSubmitted }) {
   const { studentId } = useAuth();
-  const [category, setCategory] = useState(CATEGORIES[0]);
+  const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
@@ -17,6 +15,11 @@ export default function ComplaintForm({ onSubmitted }) {
     setMessage(null);
     setError(null);
 
+    if (!title.trim()) {
+      setError('Please provide a short title for the complaint.');
+      return;
+    }
+
     if (!description.trim()) {
       setError('Please describe the issue.');
       return;
@@ -26,12 +29,13 @@ export default function ComplaintForm({ onSubmitted }) {
     try {
       const res = await api.post('/complaints', {
         student_id: studentId,
-        title: category, // backend expects `title`
+        title: title.trim(),
         description: description.trim(),
       });
 
       const data = res.data || {};
       setMessage(data.message || 'Complaint submitted successfully.');
+      setTitle('');
       setDescription('');
       onSubmitted?.();
     } catch (err) {
@@ -60,14 +64,14 @@ export default function ComplaintForm({ onSubmitted }) {
       </label>
 
       <label className="field">
-        <span>Category</span>
-        <select value={category} onChange={(e) => setCategory(e.target.value)} disabled={loading}>
-          {CATEGORIES.map((cat) => (
-            <option key={cat} value={cat}>
-              {cat}
-            </option>
-          ))}
-        </select>
+        <span>Title</span>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Short summary (e.g., 'WiFi down on 3rd floor')"
+          disabled={loading}
+        />
       </label>
 
       <label className="field">

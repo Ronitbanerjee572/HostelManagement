@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import api from '../config/api'; // Use the Axios instance that attaches the JWT
+import StudentsPicker from './StudentsPicker';
 
 export default function AssignRoomModal({ room, onClose, onSuccess }) {
   const [studentId, setStudentId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -62,14 +64,19 @@ export default function AssignRoomModal({ room, onClose, onSuccess }) {
 
           <label className="field">
             <span>Student ID (Database ID)</span>
-            <input
-              type="number"
-              value={studentId}
-              onChange={(e) => setStudentId(e.target.value)}
-              placeholder="e.g. 13000123076"
-              disabled={loading}
-              autoFocus
-            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                type="number"
+                value={studentId}
+                onChange={(e) => setStudentId(e.target.value)}
+                placeholder="e.g. 13000123076"
+                disabled={loading}
+                autoFocus
+              />
+              <button type="button" className="btn btn-sm" onClick={() => setPickerOpen(true)} disabled={loading}>
+                Pick
+              </button>
+            </div>
           </label>
 
           <label className="field">
@@ -88,6 +95,15 @@ export default function AssignRoomModal({ room, onClose, onSuccess }) {
           </div>
         </form>
       </div>
-    </div>
+        {pickerOpen && (
+          <StudentsPicker
+            onSelect={(s) => {
+              setStudentId(String(s.student_id));
+              setPickerOpen(false);
+            }}
+            onClose={() => setPickerOpen(false)}
+          />
+        )}
+      </div>
   );
 }

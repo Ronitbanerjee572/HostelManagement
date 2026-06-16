@@ -3,9 +3,11 @@ import Layout from '../components/Layout';
 import RoomManagement from '../components/RoomManagement';
 import FinancialTracking from '../components/FinancialTracking';
 import ComplaintsTerminal from '../components/ComplaintsTerminal';
+import AdminAllocations from '../components/AdminAllocations';
 
 const TABS = [
-  { id: 'rooms', label: 'Room management' },
+  { id: 'rooms', label: 'Room occupancy' },
+  { id: 'allocations', label: 'Allocations' },
   { id: 'fees', label: 'Financial tracking' },
   { id: 'complaints', label: 'Operations terminal' },
 ];
@@ -46,7 +48,7 @@ export default function AdminDashboard() {
           <>
             <h3 className="panel-title">Outstanding fees</h3>
             <p className="panel-desc muted">
-              Full defaulters list from Oracle — mark invoices as paid when settled.
+              Full defaulters list — mark invoices as paid when settled.
             </p>
             <FinancialTracking />
           </>
@@ -59,6 +61,14 @@ export default function AdminDashboard() {
               Resolve or remove facility tickets as operations are completed.
             </p>
             <ComplaintsTerminal />
+          </>
+        )}
+        
+        {activeTab === 'allocations' && (
+          <>
+            <h3 className="panel-title">Current allocations</h3>
+            <p className="panel-desc muted">View and revoke current room allocations.</p>
+            <AdminAllocations />
           </>
         )}
       </section>

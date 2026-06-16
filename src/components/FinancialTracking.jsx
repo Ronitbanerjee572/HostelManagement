@@ -95,9 +95,17 @@ export default function FinancialTracking() {
                 return (
                   <tr key={id}>
                     <td>{field(row, 'id', 'invoice_id', 'fee_id') ?? '—'}</td>
-                    <td>{field(row, 'student_id', 'STUDENT_ID') ?? '—'}</td>
+                    <td>{field(row, 'name', 'student_name') ?? field(row, 'student_id', 'STUDENT_ID') ?? '—'}</td>
                     <td>{field(row, 'amount', 'fee_amount', 'total') ?? '—'}</td>
-                    <td>{field(row, 'due_date', 'duedate', 'due') ?? '—'}</td>
+                        <td>
+                          {(() => {
+                            const d = field(row, 'due_date', 'duedate', 'due');
+                            if (!d) return '—';
+                            const t = Date.parse(d);
+                            if (isNaN(t)) return d;
+                            return new Date(t).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                          })()}
+                        </td>
                     <td>
                       <span className="status-pill status-pending">
                         {field(row, 'status', 'payment_status') ?? 'Outstanding'}

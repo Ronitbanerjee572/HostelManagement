@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import api from '../config/api';
 import AssignRoomModal from './AssignRoomModal';
+import RoomFormModal from './RoomFormModal';
 
 export default function RoomManagement() {
   const [rooms, setRooms] = useState([]);
@@ -8,6 +9,7 @@ export default function RoomManagement() {
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
   const [assignRoom, setAssignRoom] = useState(null);
+  const [roomForm, setRoomForm] = useState(null);
 
   const loadRooms = useCallback(async () => {
     setLoading(true);
@@ -51,6 +53,11 @@ export default function RoomManagement() {
 
   return (
     <>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+        <button className="btn btn-primary" onClick={() => setRoomForm({})}>
+          Add room
+        </button>
+      </div>
       {toast && (
         <div className="alert alert-success" role="status">
           {toast}
@@ -98,14 +105,23 @@ export default function RoomManagement() {
                       </span>
                     </td>
                     <td>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-primary"
-                        onClick={() => setAssignRoom(room)} // Pass the whole room object, not just the number
-                        disabled={status === 'FULL' || status === 'MAINTENANCE'}
-                      >
-                        Assign student
-                      </button>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-primary"
+                              onClick={() => setAssignRoom(room)} // Pass the whole room object, not just the number
+                              disabled={status === 'FULL' || status === 'MAINTENANCE'}
+                            >
+                              Assign
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-ghost"
+                              onClick={() => setRoomForm(room)}
+                            >
+                              Edit
+                            </button>
+                          </div>
                     </td>
                   </tr>
                 );
@@ -120,6 +136,16 @@ export default function RoomManagement() {
           room={assignRoom}
           onClose={() => setAssignRoom(null)}
           onSuccess={handleAssignSuccess}
+        />
+      )}
+      {roomForm && (
+        <RoomFormModal
+          room={roomForm}
+          onClose={() => setRoomForm(null)}
+          onSaved={() => {
+            loadRooms();
+            setRoomForm(null);
+          }}
         />
       )}
     </>

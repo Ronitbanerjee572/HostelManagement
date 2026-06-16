@@ -12,7 +12,7 @@ export default function Layout({ title, subtitle, children }) {
           </span>
           <div>
             <h1>Hostel Management</h1>
-            <p className="brand-tagline">Oracle Cloud Gateway Portal</p>
+            <p className="brand-tagline">Cloud Gateway Portal</p>
           </div>
         </div>
         <div className="header-meta">
@@ -40,7 +40,7 @@ export default function Layout({ title, subtitle, children }) {
       </main>
 
       <footer className="app-footer">
-        <span>Connected to gateway at localhost:5000</span>
+        <span>Netlify • Render • Railway</span>
       </footer>
     </div>
   );

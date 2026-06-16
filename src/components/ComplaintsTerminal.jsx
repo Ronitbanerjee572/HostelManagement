@@ -101,7 +101,7 @@ export default function ComplaintsTerminal() {
             <tr>
               <th>ID</th>
               <th>Student</th>
-              <th>Category</th>
+              {/* Category removed: database has no category field */}
               <th>Description</th>
               <th>Status</th>
               <th>Actions</th>
@@ -124,8 +124,8 @@ export default function ComplaintsTerminal() {
                 return (
                   <tr key={id}>
                     <td>{id}</td>
-                    <td>{field(row, 'student_id', 'STUDENT_ID') ?? '—'}</td>
-                    <td>{field(row, 'category', 'complaint_category') ?? '—'}</td>
+                    <td>{field(row, 'name', 'student_name') ?? field(row, 'student_id', 'STUDENT_ID') ?? '—'}</td>
+                    {/* category column removed */}
                     <td className="desc-cell">{field(row, 'description', 'details') ?? '—'}</td>
                     <td>
                       <span
